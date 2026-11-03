@@ -4,6 +4,7 @@ import { EXAMPLES } from './examples';
 import { highlight } from './highlight';
 import { applyStaticTranslations, dialectLabel, Language, text, translateConversionText } from './i18n';
 import { Preview } from './preview';
+import { errorLine, numberCode, numberTextarea } from './gutter';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -21,6 +22,9 @@ const tabShader = $<HTMLButtonElement>('tab-shader');
 const tabScript = $<HTMLButtonElement>('tab-script');
 const copyStatus = $('copy-status');
 const previewStatus = $('preview-status');
+const fragmentGutter = numberTextarea(fragment);
+const vertexGutter = numberTextarea(vertex);
+const codeGutter = numberCode(code);
 const languageSelect = $<HTMLSelectElement>('language');
 
 let result: ConvertResult | null = null;
@@ -53,6 +57,12 @@ function run() {
   if (!result.script && tab === 'script') setTab('shader');
   renderCode();
   renderMessages();
+  // Erreur de syntaxe : on marque la ligne dans la bonne zone de texte
+  const err = !result.ok ? result.messages.find((m) => m.level === 'error') : undefined;
+  const line = err ? errorLine(err.text) : null;
+  const inVertex = !!err && /vertex/i.test(err.text);
+  fragmentGutter.setError(inVertex ? null : line);
+  vertexGutter.setError(inVertex ? line : null);
   saveDraft();
 }
 
@@ -60,6 +70,7 @@ function renderCode() {
   if (!result) return;
   if (!result.ok) {
     code.innerHTML = '';
+    codeGutter.update('');
     code.parentElement!.classList.add('empty');
     code.parentElement!.setAttribute('data-empty-text', text('emptyCode', language));
     return;
@@ -68,6 +79,7 @@ function renderCode() {
   code.parentElement!.removeAttribute('data-empty-text');
   const output = tab === 'script' && result.script ? result.script : result.shader;
   code.innerHTML = highlight(output);
+  codeGutter.update(output);
 }
 
 function renderMessages() {
@@ -212,6 +224,8 @@ function applyState(s: { f?: string; v?: string; hv?: boolean; t?: string }) {
   hasVertex.checked = !!(s.hv ?? s.v);
   vertexWrap.hidden = !hasVertex.checked;
   if (s.t) target.value = s.t;
+  fragmentGutter.update();
+  vertexGutter.update();
 }
 
 /* ---------- Exemples ---------- */

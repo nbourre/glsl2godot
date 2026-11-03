@@ -121,3 +121,20 @@ describe('erreurs', () => {
     expect(r.messages[0].text).toMatch(/ligne 3/);
   });
 });
+
+describe('préprocesseur', () => {
+  it('ignore les commentaires à la fin des #define', () => {
+    const r = convert({
+      fragment: '#define K 0.38 // un commentaire\n#define M(a) (a * 2.0) /* bloc */\nvoid mainImage(out vec4 c, in vec2 f){ float x = f.x * K; c = vec4(M(x)); }',
+    });
+    expect(r.ok).toBe(true);
+    expect(r.shader).toContain('f.x * 0.38;');
+  });
+
+  it('donne la ligne de l’erreur dans le code collé, malgré les #define retirés', () => {
+    const src = ['#define A 1.0', '#define B 2.0', '', 'void mainImage(out vec4 c, in vec2 f){', '  float x = A;', '  float y = B', '  c = vec4(x + y);', '}'].join('\n');
+    const r = convert({ fragment: src, language: 'fr' });
+    expect(r.ok).toBe(false);
+    expect(r.messages[0].text).toMatch(/ligne 7/);
+  });
+});

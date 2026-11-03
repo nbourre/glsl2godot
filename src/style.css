@@ -1,4 +1,5 @@
 :root {
+  --gutter-w: 3.6em;
   --bg: #eef1f6;
   --panel: #ffffff;
   --panel-2: #f5f7fb;
@@ -226,6 +227,73 @@ textarea {
 }
 .editor.grow textarea { flex: 1; min-height: 360px; }
 
+/* ---------- Numéros de ligne ---------- */
+.numbered {
+  position: relative;
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+  overflow: hidden;
+  min-width: 0;
+}
+.numbered:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.numbered textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  margin-left: var(--gutter-w);
+  padding-left: 12px;
+  outline: none;
+}
+/* La colonne est positionnée en absolu pour ne pas imposer sa hauteur à la zone de texte */
+.numbered > .gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--gutter-w);
+  min-width: 0;
+}
+.editor.grow .numbered { flex: 1; min-height: 360px; }
+.editor.grow .numbered textarea { min-height: 0; resize: none; }
+.gutter {
+  flex: none;
+  min-width: 3.4em;
+  padding: 12px 10px 40px 8px;
+  text-align: right;
+  white-space: pre;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  color: var(--tk-c);
+  background: var(--panel-2);
+  border-right: 1px solid var(--line);
+  user-select: none;
+}
+.gutter .ln-err {
+  color: var(--err);
+  font-weight: 600;
+  background: var(--err-bg);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-right: -3px;
+}
+.numbered-pre { display: flex; align-items: flex-start; padding: 0; }
+.numbered-pre.empty { display: block; padding: 12px 14px; }
+.numbered-pre.empty .gutter { display: none; }
+.numbered-pre .gutter {
+  position: sticky;
+  left: 0;
+  align-self: stretch;
+  padding-bottom: 12px;
+}
+.numbered-pre code { display: block; padding: 12px 14px; flex: 1; }
+
 .tabs { display: flex; gap: 4px; }
 .tabs button {
   border: 1px solid transparent;
@@ -306,7 +374,7 @@ textarea {
 @media (max-width: 900px) {
   .work, .notes { grid-template-columns: minmax(0, 1fr); }
   .pane { min-height: 0; }
-  .editor.grow textarea, .code { min-height: 280px; }
+  .editor.grow .numbered, .code { min-height: 280px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
