@@ -136,7 +136,15 @@ export class Preview {
       this.defaults = built.defaults;
       this.start = performance.now();
       this.frame = 0;
-      this.onStatus(true, fr ? 'Shader d’origine, rendu par ton navigateur.' : 'Original shader, rendered by your browser.');
+      const sim = built.simulated?.length ?? 0;
+      this.onStatus(
+        true,
+        sim
+          ? fr
+            ? 'Fragment shader seul, sur une surface plane : les varyings viennent des UV, pas du vertex shader.'
+            : 'Fragment shader only, on a flat surface: varyings come from UVs, not from the vertex shader.'
+          : fr ? 'Shader d’origine, rendu par ton navigateur.' : 'Original shader, rendered by your browser.',
+      );
       cancelAnimationFrame(this.raf);
       this.loop();
     } catch (e: any) {
@@ -218,6 +226,7 @@ interface Built {
   fs: string;
   offset: number; // lignes ajoutées avant le code de l'utilisateur
   defaults: UniformDefault[];
+  simulated?: string[]; // varyings simulés faute de vertex shader
 }
 
 const blankLines = (s: string) => s.replace(/[^\n]/g, '');
@@ -247,20 +256,34 @@ function stripUniformInits(src: string, defaults: UniformDefault[]): string {
   );
 }
 
-/** Uniforms de couleur sans valeur : blanc plutôt que noir, pour voir quelque chose. */
+// Couleurs distinctes pour les uniforms de couleur que l'application fournirait normalement
+const PREVIEW_PALETTE = [
+  [1.0, 0.45, 0.2],
+  [0.2, 0.55, 1.0],
+  [0.35, 0.9, 0.5],
+  [0.95, 0.8, 0.3],
+  [0.85, 0.35, 0.8],
+];
+
+/** Uniforms de couleur sans valeur : une couleur de la palette plutôt que du noir. */
 function colorDefaults(src: string, defaults: UniformDefault[]) {
+  let k = 0;
   for (const m of src.matchAll(/^\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?(vec[34])\s+(\w*(?:colou?r|tint)\w*)\s*;/gim)) {
-    if (!defaults.some((d) => d.name === m[2])) defaults.push({ name: m[2], type: m[1], value: m[1] === 'vec3' ? [1, 1, 1] : [1, 1, 1, 1] });
+    if (defaults.some((d) => d.name === m[2])) continue;
+    const c = PREVIEW_PALETTE[k++ % PREVIEW_PALETTE.length];
+    defaults.push({ name: m[2], type: m[1], value: m[1] === 'vec3' ? c : [...c, 1] });
   }
 }
 
 /** Vertex shader qui fournit les varyings attendus par le fragment shader. */
 function vertexFor(varyings: [string, string][], es3: boolean): string {
-  const fill = (type: string) =>
-    type === 'float' ? 'uv.x' : type === 'vec2' ? 'uv' : type === 'vec3' ? 'vec3(uv, 0.0)' : 'vec4(uv, 0.0, 1.0)';
+  const fill = (type: string, name: string) =>
+    type === 'vec3' && /norm/i.test(name)
+      ? 'normalize(vec3((uv - 0.5) * 1.5, 1.0))'
+      : type === 'float' ? 'uv.x' : type === 'vec2' ? 'uv' : type === 'vec3' ? 'vec3(uv, 0.0)' : 'vec4(uv, 0.0, 1.0)';
   const head = es3 ? '#version 300 es\nin vec2 p;\n' : 'attribute vec2 p;\n';
   const decl = varyings.map(([t, n]) => `${es3 ? 'out' : 'varying'} ${t} ${n};`).join('\n');
-  const body = varyings.map(([t, n]) => `${n} = ${fill(t)};`).join('\n');
+  const body = varyings.map(([t, n]) => `${n} = ${fill(t, n)};`).join('\n');
   return `${head}${decl}\nvoid main(){ vec2 uv = p * 0.5 + 0.5;\n${body}\ngl_Position = vec4(p, 0.0, 1.0); }`;
 }
 
@@ -377,13 +400,13 @@ function buildPreview(source: string): Built | string | null {
     const header = '#version 300 es\n' + [...ext.lines.filter((l) => l.startsWith('#'))].join('\n') + (ext.lines.some((l) => l.startsWith('#')) ? '\n' : '') +
       precision + 'precision highp int;\n' + ext.lines.filter((l) => !l.startsWith('#')).map((l) => l + '\n').join('');
     const varyings: [string, string][] = [...src.matchAll(ES3_IN)].map((m) => [m[1], m[2]]);
-    return { vs: vertexFor(varyings, true), fs: header + src, offset: countLines(header), defaults };
+    return { vs: vertexFor(varyings, true), fs: header + src, offset: countLines(header), defaults, simulated: varyings.map((v) => v[1]) };
   }
 
   // GLSL ES 1.00 (WebGL 1) ou GLSL desktop 1.10 / 1.20
   const header = ext.lines.map((l) => l + '\n').join('') + precision;
   const varyings: [string, string][] = [...src.matchAll(ES1_VARYING)].map((m) => [m[1], m[2]]);
-  return { vs: vertexFor(varyings, false), fs: header + src, offset: countLines(header), defaults };
+  return { vs: vertexFor(varyings, false), fs: header + src, offset: countLines(header), defaults, simulated: varyings.map((v) => v[1]) };
 }
 
 /** Garde la première erreur du compilateur, avec le numéro de ligne du code collé. */
