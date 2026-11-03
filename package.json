@@ -16,6 +16,8 @@
     "@shaderfrog/glsl-parser": "^7.0.1"
   },
   "devDependencies": {
+    "@fontsource/atkinson-hyperlegible": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vite-node": "^6.0.0",
