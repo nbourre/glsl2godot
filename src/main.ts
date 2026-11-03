@@ -46,6 +46,23 @@ preview.onStatus = (ok, msg) => {
   document.body.classList.toggle('no-preview', !ok);
 };
 
+/** Transforme les chemins textures/*.png d'un message en liens de téléchargement. */
+function linkify(msg: string): (string | Node)[] {
+  const out: (string | Node)[] = [];
+  let last = 0;
+  for (const m of msg.matchAll(/textures\/[\w.-]+\.png/g)) {
+    out.push(msg.slice(last, m.index));
+    const a = document.createElement('a');
+    a.href = m[0];
+    a.download = m[0].split('/').pop()!;
+    a.textContent = a.download;
+    out.push(a);
+    last = m.index! + m[0].length;
+  }
+  out.push(msg.slice(last));
+  return out;
+}
+
 /* ---------- Conversion ---------- */
 function run() {
   const vtx = hasVertex.checked ? vertex.value : '';
@@ -97,7 +114,7 @@ function renderMessages() {
     li.className = 'msg msg-' + m.level;
     const tag = document.createElement('strong');
     tag.textContent = m.level === 'error' ? text('error', language) : m.level === 'warning' ? text('check', language) : text('note', language);
-    li.append(tag, document.createTextNode(' ' + translateConversionText(m.text, language)));
+    li.append(tag, ' ', ...linkify(translateConversionText(m.text, language)));
     messages.append(li);
   }
   for (const s of result.setup) {

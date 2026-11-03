@@ -43,29 +43,52 @@ export class Preview {
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    // texture noire pour les iChannel
-    const tex = gl.createTexture();
-    for (let i = 0; i < 4; i++) {
-      gl.activeTexture(gl.TEXTURE0 + i);
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-    }
-    // Texture de test (damier coloré) pour les iChannel et les sampler2D
-    const N = 256;
-    const px = new Uint8Array(N * N * 4);
-    for (let y = 0; y < N; y++)
-      for (let x = 0; x < N; x++) {
-        const i = (y * N + x) * 4;
-        const check = ((x >> 5) + (y >> 5)) & 1 ? 1 : 0.72;
-        px[i] = (40 + (x / N) * 200) * check;
-        px[i + 1] = (60 + (y / N) * 160) * check;
-        px[i + 2] = (200 - (x / N) * 120) * check;
-        px[i + 3] = 255;
+    // Textures des iChannel (unités 0 à 3) : bruits compatibles avec ceux de Shadertoy.
+    // Unité 4 : damier coloré pour les autres sampler2D (textures d'image).
+    const rand = mulberry32(0x5eed);
+    const makeTex = (unit: number, size: number, fill: (px: Uint8Array, n: number) => void) => {
+      const t = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      const px = new Uint8Array(size * size * 4);
+      fill(px, size);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    };
+    // Bruit RGBA façon « RGBA Noise Medium » : le canal vert est le rouge décalé de (37, 17).
+    // Beaucoup de shaders (dont les nuages et le bruit 3D d'Inigo Quilez) comptent là-dessus
+    // pour faire du bruit 3D avec une seule lecture 2D.
+    const noiseRGBA = (px: Uint8Array, n: number) => {
+      for (let i = 0; i < n * n; i++) {
+        px[i * 4] = rand() * 256;
+        px[i * 4 + 2] = rand() * 256;
+        px[i * 4 + 3] = rand() * 256;
       }
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, N, N, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      for (let y = 0; y < n; y++)
+        for (let x = 0; x < n; x++) {
+          const src = (((y + 17) & (n - 1)) * n + ((x - 37) & (n - 1))) * 4;
+          px[(y * n + x) * 4 + 1] = px[src];
+        }
+    };
+    makeTex(0, 256, noiseRGBA);
+    makeTex(1, 1024, noiseRGBA);
+    makeTex(2, 256, noiseRGBA);
+    makeTex(3, 64, noiseRGBA);
+    makeTex(4, 256, (px, n) => {
+      for (let y = 0; y < n; y++)
+        for (let x = 0; x < n; x++) {
+          const i = (y * n + x) * 4;
+          const check = ((x >> 5) + (y >> 5)) & 1 ? 1 : 0.72;
+          px[i] = (40 + (x / n) * 200) * check;
+          px[i + 1] = (60 + (y / n) * 160) * check;
+          px[i + 2] = (200 - (x / n) * 120) * check;
+          px[i + 3] = 255;
+        }
+    });
 
     const pos = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
@@ -134,6 +157,14 @@ export class Preview {
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) ?? 'link');
       this.prog = prog;
       this.defaults = built.defaults;
+      gl.useProgram(prog);
+      const nu = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS) as number;
+      for (let i = 0; i < nu; i++) {
+        const info = gl.getActiveUniform(prog, i);
+        if (!info || info.type !== gl.SAMPLER_2D) continue;
+        const ch = info.name.match(/^iChannel([0-3])$/);
+        gl.uniform1i(gl.getUniformLocation(prog, info.name), ch ? parseInt(ch[1], 10) : 4);
+      }
       this.start = performance.now();
       this.frame = 0;
       const sim = built.simulated?.length ?? 0;
@@ -199,12 +230,10 @@ export class Preview {
     if (fl) gl.uniform1i(fl, this.frame);
     this.frame++;
     const d = new Date();
+    const cr = u('iChannelResolution');
+    if (cr) gl.uniform3fv(cr, [256, 256, 1, 1024, 1024, 1, 256, 256, 1, 64, 64, 1]);
     const dl = u('iDate') ?? u('DATE');
     if (dl) gl.uniform4f(dl, d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds());
-    for (let i = 0; i < 4; i++) {
-      const l = u('iChannel' + i);
-      if (l) gl.uniform1i(l, i);
-    }
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -418,4 +447,15 @@ function formatLog(log: string, offset: number, fr: boolean): string {
   const line = parseInt(m[1], 10) - offset;
   const msg = m[2].replace(/^'([^']*)'\s*:\s*/, (_x, tok) => (tok ? `'${tok}' : ` : ''));
   return line > 0 ? `${fr ? 'ligne' : 'line'} ${line} : ${msg}` : msg;
+}
+
+/** Générateur pseudo-aléatoire déterministe : les textures de bruit sont les mêmes à chaque visite. */
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }

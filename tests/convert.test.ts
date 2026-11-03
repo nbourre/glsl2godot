@@ -138,3 +138,11 @@ describe('préprocesseur', () => {
     expect(r.messages[0].text).toMatch(/ligne 7/);
   });
 });
+
+describe('opérateurs entiers sur vecteurs', () => {
+  it('convertit le scalaire en vecteur pour & | ^ et les décalages', () => {
+    const r = st('void mainImage(out vec4 c, in vec2 f){ ivec2 px = ivec2(f); ivec2 a = px & 255; ivec2 b = 3 << px; c = vec4(vec2(a + b), 0.0, 1.0); }');
+    expect(r.shader).toContain('px & ivec2(255)');
+    expect(r.shader).toContain('ivec2(3) << px');
+  });
+});

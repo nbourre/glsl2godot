@@ -33,6 +33,10 @@ Le code est analysé avec un vrai parseur GLSL ([@shaderfrog/glsl-parser](https:
 
 Chaque conversion affiche ce qui demande une vérification : textures à assigner, `#define` fournis par l'application, récursion (interdite dans Godot), passes multiples, etc.
 
+## Textures de bruit Shadertoy
+
+Beaucoup de shaders Shadertoy lisent leur bruit dans une texture « RGBA Noise » dont le canal vert est le canal rouge décalé de (37, 17) pixels (c'est ce qui permet du bruit 3D avec une seule lecture 2D). Le site fournit des textures qui suivent cette convention : `textures/rgba_noise_256.png` et `textures/rgba_noise_64.png`. Assigne-les à l'`iChannel` correspondant dans Godot, importées en mode **Lossless**. Pour les régénérer : `python3 tools/make-noise.py`.
+
 ## Limites connues
 
 - **Multipasse** (Buffers Shadertoy, `PASSES` ISF) : il faut recréer chaque passe avec un `SubViewport`.
