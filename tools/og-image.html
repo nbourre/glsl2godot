@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  /* Polices du site, chargées depuis node_modules (npm install) pour un rendu hors ligne */
+  @font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 400; src: url('../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-normal.woff2'); }
+  @font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 700; src: url('../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-700-normal.woff2'); }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url('../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2'); }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 600; src: url('../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2'); }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #161b27; }
+  canvas { position: absolute; inset: 0; width: 1200px; height: 630px; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(14,18,28,.92) 0%, rgba(14,18,28,.78) 42%, rgba(14,18,28,0) 72%); }
+  .text { position: absolute; left: 72px; top: 0; bottom: 0; width: 600px; display: flex; flex-direction: column; justify-content: center; gap: 22px; color: #eef1f6; font-family: 'Atkinson Hyperlegible', sans-serif; }
+  h1 { margin: 0; font-size: 84px; line-height: 1; letter-spacing: -0.03em; }
+  p { margin: 0; font-size: 30px; line-height: 1.35; color: #c9d1e2; }
+  .code { display: inline-flex; flex-direction: column; gap: 6px; align-self: flex-start; margin-top: 8px; padding: 16px 20px; border-radius: 12px; background: rgba(25,30,43,.85); border: 1px solid #39435b; font: 22px/1.4 'JetBrains Mono', monospace; color: #e6e9f1; }
+  .k { color: #d29bf5; } .t { color: #6fc8e0; } .b { color: #f2a35e; font-weight: 600; } .c { color: #7b859a; }
+  .url { font-size: 22px; color: #9aa4bb; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1200" height="630"></canvas>
+<div class="shade"></div>
+<div class="text">
+  <h1>GLSL to Godot</h1>
+  <p>Paste a shader from Shadertoy, GLSL Sandbox, ISF, three.js or OpenGL. Get a .gdshader for Godot 4.</p>
+  <div class="code">
+    <div><span class="c">GLSL&nbsp;&nbsp;</span> <span class="k">void</span> mainImage(<span class="k">out</span> <span class="t">vec4</span> c, …)</div>
+    <div><span class="c">Godot&nbsp;</span> <span class="k">void</span> fragment() { <span class="b">COLOR</span> = … }</div>
+  </div>
+  <div class="url">nicolasbourre.com/glsl2godot</div>
+</div>
+<script>
+// Rendu d'une image fixe du shader d'exemple (tests/corpus/shadertoy_scene.glsl), injecté par le script
+const gl = document.getElementById('c').getContext('webgl2', { preserveDrawingBuffer: true });
+const vs = '#version 300 es\nin vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
+const fs = '#version 300 es\nprecision highp float;\nuniform vec3 iResolution; uniform float iTime; uniform vec4 iMouse; out vec4 o;\n'
+  + window.SHADER + '\nvoid main(){ mainImage(o, gl_FragCoord.xy - vec2(330.0, 0.0)); o.a = 1.0; }';
+const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(pr, 0, 'p'); gl.linkProgram(pr); gl.useProgram(pr);
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+gl.uniform3f(gl.getUniformLocation(pr, 'iResolution'), 1200, 630, 1);
+gl.uniform1f(gl.getUniformLocation(pr, 'iTime'), window.TIME);
+gl.uniform4f(gl.getUniformLocation(pr, 'iMouse'), 0, 0, 0, 0);
+gl.viewport(0, 0, 1200, 630); gl.drawArrays(gl.TRIANGLES, 0, 3);
+window.DONE = true;
+</script>
+</body>
+</html>
