@@ -72,3 +72,7 @@ Les fichiers nommés `expect-fail_*` doivent échouer (par exemple la récursion
 ## Licence
 
 MIT
+
+### Exemples tiers
+
+- `src/examples/seascape.glsl` : « Seascape » par Alexander Alekseev (TDM), 2014, [sur Shadertoy](https://www.shadertoy.com/view/Ms2SD1). Licence [Creative Commons BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/), pas MIT : ce fichier garde sa licence d'origine.

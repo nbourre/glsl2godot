@@ -1,3 +1,4 @@
+import seascape from './examples/seascape.glsl?raw';
 import shadertoyBasic from '../tests/corpus/shadertoy_basic.glsl?raw';
 import shadertoyScene from '../tests/corpus/shadertoy_scene.glsl?raw';
 import glslsandbox from './examples/glslsandbox.glsl?raw';
@@ -16,6 +17,7 @@ export interface Example {
 }
 
 export const EXAMPLES: Example[] = [
+  { id: 'seascape', label: 'Seascape (TDM, Shadertoy)', fragment: seascape },
   { id: 'scene', label: 'Shadertoy (raymarching)', fragment: shadertoyScene },
   { id: 'shadertoy', label: 'Shadertoy', fragment: shadertoyBasic },
   { id: 'sandbox', label: 'GLSL Sandbox', fragment: glslsandbox },
