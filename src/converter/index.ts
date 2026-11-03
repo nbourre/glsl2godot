@@ -208,9 +208,11 @@ export function convert(opts: ConvertOptions): ConvertResult {
   /* --- ISF : en-tête JSON --- */
   let isf: any = null;
   const isfMatch = fragSrc.match(/^\s*\/\*\s*(\{[\s\S]*?\})\s*\*\//);
+  let fragLineOffset = 0;
   if (isfMatch) {
     try {
       isf = JSON.parse(isfMatch[1]);
+      fragLineOffset = (isfMatch[0].match(/\n/g) ?? []).length;
       fragSrc = fragSrc.slice(isfMatch[0].length);
     } catch {
       isf = null;
@@ -230,6 +232,7 @@ export function convert(opts: ConvertOptions): ConvertResult {
       s = s.replace(/^\s*#include\s*".*$/gm, '');
     }
     s = s.replace(/^\s*#\s*(version|extension|pragma)\b.*$/gm, '');
+    s = stripDefineComments(s);
     try {
       return preprocess(s, { preserveComments: true } as any);
     } catch (e: any) {
@@ -243,7 +246,7 @@ export function convert(opts: ConvertOptions): ConvertResult {
 
   /* --- Parse --- */
   const GLSL3_WORDS = /\b(sample|input|output|filter|active|common|partition|patch|buffer|shared|resource|precise|noperspective|superp|coherent|volatile|restrict|readonly|writeonly)\b/g;
-  const parseStage = (src: string, kind: StageKind): Stage | string => {
+  const parseStage = (src: string, kind: StageKind, original: string, lineOffset = 0): Stage | string => {
     try {
       let ast: Node;
       try {
@@ -259,7 +262,9 @@ export function convert(opts: ConvertOptions): ConvertResult {
       return buildStage(ast, kind);
     } catch (e: any) {
       const loc = e.location?.start;
-      const where = loc ? ` (ligne ${loc.line}, colonne ${loc.column})` : '';
+      // Le préprocesseur retire les #define : on retrouve la ligne correspondante dans le code collé
+      const line = loc ? mapLine(src.split('\n'), original.replace(/\r\n?/g, '\n').split('\n'), loc.line - 1) + 1 + lineOffset : 0;
+      const where = loc ? ` (ligne ${line}, colonne ${loc.column})` : '';
       return `Erreur de syntaxe GLSL dans le ${kind === 'vertex' ? 'vertex' : 'fragment'} shader${where} : ${String(e.message ?? e).split('\n')[0]}`;
     }
   };
@@ -267,12 +272,12 @@ export function convert(opts: ConvertOptions): ConvertResult {
   let frag: Stage | null = null;
   let vert: Stage | null = null;
   if (fragPre) {
-    const r = parseStage(fragPre, 'fragment');
+    const r = parseStage(fragPre, 'fragment', fragSrc, fragLineOffset);
     if (typeof r === 'string') return fail(r);
     frag = r;
   }
   if (vertPre) {
-    const r = parseStage(vertPre, 'vertex');
+    const r = parseStage(vertPre, 'vertex', vertSrc);
     if (typeof r === 'string') return fail(r);
     vert = r;
   }
@@ -1708,4 +1713,63 @@ function isfUniform(inp: any): string | null {
       return `uniform sampler2D ${name} : repeat_enable, filter_linear_mipmap;`;
   }
   return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Préprocesseur : aides                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Retire les commentaires à la fin des #define. Sinon le préprocesseur colle
+ * le commentaire à chaque utilisation de la macro, et « x * MACRO; » devient
+ * « x * 0.38 // commentaire; » : le point-virgule disparaît dans le commentaire.
+ */
+export function stripDefineComments(src: string): string {
+  const lines = src.split('\n');
+  let inDefine = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (!inDefine && !/^\s*#\s*define\b/.test(lines[i])) continue;
+    lines[i] = lines[i].replace(/\/\*.*?\*\//g, ' ').replace(/\/\/.*$/, '').replace(/\s+$/, '');
+    inDefine = lines[i].endsWith('\\');
+  }
+  return lines.join('\n');
+}
+
+const normLine = (l: string) => l.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '').trim();
+const words = (l: string) => new Set(l.match(/\w+/g) ?? []);
+
+function similarity(a: string, b: string): number {
+  if (a === b) return 1;
+  const A = words(a);
+  const B = words(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const w of A) if (B.has(w)) inter++;
+  return inter / (A.size + B.size - inter);
+}
+
+/** Associe une ligne du code préprocessé à la ligne d'origine (index à partir de 0). */
+export function mapLine(pre: string[], orig: string[], target: number): number {
+  let cursor = 0;
+  for (let p = 0; p <= target && p < pre.length; p++) {
+    const n = normLine(pre[p]);
+    let best = -1;
+    let score = 0;
+    if (n) {
+      for (let k = cursor; k < Math.min(orig.length, cursor + 80); k++) {
+        const o = normLine(orig[k]);
+        if (!o || /^#/.test(o)) continue;
+        const sc = similarity(n, o);
+        if (sc > score) {
+          score = sc;
+          best = k;
+          if (sc === 1) break;
+        }
+      }
+    }
+    const found = best >= 0 && score >= 0.5;
+    if (p === target) return found ? best : Math.min(cursor + (target - p), orig.length - 1);
+    if (found) cursor = best + 1;
+  }
+  return Math.min(target, orig.length - 1);
 }
