@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GLSL vers Godot</title>
+    <meta name="description" content="Convertis un shader GLSL (Shadertoy, GLSL Sandbox, Book of Shaders, ISF, three.js, OpenGL) en shader Godot 4, directement dans le navigateur." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e06bb4'/%3E%3Cstop offset='.5' stop-color='%2350b8d8'/%3E%3Cstop offset='1' stop-color='%23e8c95a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <h1>GLSL vers Godot</h1>
+        <p>Colle un shader de n’importe où, récupère un <code>.gdshader</code> prêt pour Godot 4.</p>
+      </div>
+      <nav class="top-actions">
+        <button id="share" class="ghost" type="button">Copier le lien de partage</button>
+        <a id="repo" class="ghost" href="https://github.com/" target="_blank" rel="noopener">Code source</a>
+      </nav>
+    </header>
+
+    <section class="stage" aria-label="Aperçu du shader d’origine">
+      <canvas id="preview" aria-label="Rendu en direct du shader collé"></canvas>
+      <p id="preview-status" class="stage-status">Chargement de l’aperçu…</p>
+    </section>
+
+    <main class="work">
+      <section class="pane" aria-labelledby="src-title">
+        <div class="pane-head">
+          <h2 id="src-title">Ton shader GLSL</h2>
+          <span id="dialect" class="dialect" aria-live="polite"></span>
+        </div>
+        <div class="toolbar">
+          <label class="field">
+            <span>Exemple</span>
+            <select id="example">
+              <option value="">Choisir…</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Cible</span>
+            <select id="target">
+              <option value="auto">Automatique</option>
+              <option value="canvas_item">2D (canvas_item)</option>
+              <option value="spatial">3D (spatial)</option>
+            </select>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="has-vertex" />
+            <span>Vertex shader séparé</span>
+          </label>
+        </div>
+        <div class="editor" id="vertex-wrap" hidden>
+          <label for="vertex" class="editor-label">Vertex shader</label>
+          <textarea id="vertex" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="void main() { gl_Position = … }"></textarea>
+        </div>
+        <div class="editor grow">
+          <label for="fragment" class="editor-label" id="fragment-label">Fragment shader</label>
+          <textarea id="fragment" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Colle ici un shader Shadertoy, GLSL Sandbox, Book of Shaders, ISF, three.js ou OpenGL."></textarea>
+        </div>
+      </section>
+
+      <section class="pane out" aria-labelledby="out-title">
+        <div class="pane-head">
+          <h2 id="out-title">Pour Godot 4</h2>
+          <div class="tabs" role="tablist" aria-label="Fichiers générés">
+            <button role="tab" id="tab-shader" aria-selected="true" aria-controls="code-out">shader.gdshader</button>
+            <button role="tab" id="tab-script" aria-selected="false" aria-controls="code-out" hidden>shader_params.gd</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button id="copy" type="button" class="primary">Copier</button>
+          <button id="download" type="button">Télécharger</button>
+          <span id="copy-status" class="quiet" aria-live="polite"></span>
+        </div>
+        <pre class="code" id="code-out" role="tabpanel" tabindex="0"><code id="code"></code></pre>
+      </section>
+    </main>
+
+    <section class="notes" aria-label="Résultat de la conversion">
+      <div class="notes-col">
+        <h2>Ce qu’il faut savoir</h2>
+        <ul id="messages" class="messages"></ul>
+      </div>
+      <div class="notes-col">
+        <h2>Mise en place dans Godot</h2>
+        <ol id="setup" class="setup"></ol>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <p>La conversion se fait entièrement dans ton navigateur : ton code n’est envoyé nulle part. Testé avec Godot 4.5.</p>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

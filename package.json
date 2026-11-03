@@ -1,0 +1,27 @@
+{
+  "name": "glsl2godot",
+  "version": "1.0.0",
+  "description": "Convertisseur de shaders GLSL vers le langage de shader de Godot 4",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p . && vite build",
+    "build:single": "vite build --mode single",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "corpus": "vite-node tools/convert-corpus.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@shaderfrog/glsl-parser": "^7.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-node": "^6.0.0",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.1.0"
+  },
+  "private": true,
+  "type": "module"
+}

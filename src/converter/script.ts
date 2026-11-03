@@ -1,0 +1,103 @@
+// Génère le script GDScript compagnon qui alimente les uniforms
+// (résolution, souris, numéro d'image, date...) à chaque image.
+
+export interface ScriptRole {
+  name: string;
+  role: 'resolution' | 'mouse' | 'frame' | 'timedelta' | 'date';
+  type: string;
+  mouseFormat?: 'shadertoy' | 'normalized' | 'pixels';
+}
+
+export function generateScript(roles: ScriptRole[], canvas: boolean): string {
+  const L: string[] = [];
+  const has = (r: ScriptRole['role']) => roles.some((x) => x.role === r);
+  L.push('@tool');
+  L.push(canvas ? 'extends Control' : 'extends MeshInstance3D');
+  L.push('');
+  L.push('## Script généré par glsl2godot.');
+  L.push(canvas
+    ? '## Attache-le au ColorRect (ou autre Control) qui porte le ShaderMaterial.'
+    : '## Attache-le au MeshInstance3D qui porte le ShaderMaterial (Material Override ou surface 0).');
+  L.push('');
+  if (!canvas && has('resolution')) {
+    L.push('## Résolution virtuelle en pixels utilisée pour fragCoord / iResolution.');
+    L.push('@export var resolution := Vector2(1024, 1024)');
+    L.push('');
+  }
+  if (has('frame')) L.push('var _frame := 0');
+  if (roles.some((r) => r.role === 'mouse' && r.mouseFormat === 'shadertoy')) {
+    L.push('var _mouse := Vector2.ZERO');
+    L.push('var _click := Vector2.ZERO');
+    L.push('var _pressed := false');
+  }
+  if (L[L.length - 1] !== '') L.push('');
+
+  if (!canvas) {
+    L.push('func _get_shader_material() -> ShaderMaterial:');
+    L.push('\tif material_override is ShaderMaterial:');
+    L.push('\t\treturn material_override');
+    L.push('\tvar m := get_active_material(0)');
+    L.push('\treturn m as ShaderMaterial');
+    L.push('');
+  }
+
+  L.push('func _process(delta: float) -> void:');
+  L.push(canvas ? '\tvar mat := material as ShaderMaterial' : '\tvar mat := _get_shader_material()');
+  L.push('\tif mat == null:');
+  L.push('\t\treturn');
+  L.push(canvas ? '\tvar res := size' : '\tvar res := resolution');
+
+  const needsMouse = has('mouse');
+  if (needsMouse) {
+    if (canvas) {
+      L.push('\tvar m := get_local_mouse_position()');
+      L.push('\tm.y = res.y - m.y # origine en bas à gauche, comme en GLSL');
+    } else {
+      L.push('\tvar vp := get_viewport().get_visible_rect().size');
+      L.push('\tvar mp := get_viewport().get_mouse_position()');
+      L.push('\tvar m := Vector2(mp.x / vp.x * res.x, (1.0 - mp.y / vp.y) * res.y)');
+    }
+  }
+
+  for (const r of roles) {
+    switch (r.role) {
+      case 'resolution':
+        if (r.type === 'vec3') L.push(`\tmat.set_shader_parameter("${r.name}", Vector3(res.x, res.y, 1.0))`);
+        else L.push(`\tmat.set_shader_parameter("${r.name}", res)`);
+        break;
+      case 'mouse':
+        if (r.mouseFormat === 'shadertoy') {
+          L.push('\t# Format Shadertoy : xy = position pendant le clic, zw = point du clic (négatif une fois relâché)');
+          L.push('\tif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):');
+          L.push('\t\tif not _pressed:');
+          L.push('\t\t\t_click = m');
+          L.push('\t\t\t_pressed = true');
+          L.push('\t\t_mouse = m');
+          L.push(`\t\tmat.set_shader_parameter("${r.name}", Vector4(_mouse.x, _mouse.y, _click.x, _click.y))`);
+          L.push('\telse:');
+          L.push('\t\t_pressed = false');
+          L.push(`\t\tmat.set_shader_parameter("${r.name}", Vector4(_mouse.x, _mouse.y, -absf(_click.x), -absf(_click.y)))`);
+        } else if (r.mouseFormat === 'normalized') {
+          L.push(`\tmat.set_shader_parameter("${r.name}", Vector2(m.x / res.x, m.y / res.y))`);
+        } else if (r.type === 'vec4') {
+          L.push(`\tmat.set_shader_parameter("${r.name}", Vector4(m.x, m.y, 0.0, 0.0))`);
+        } else {
+          L.push(`\tmat.set_shader_parameter("${r.name}", m)`);
+        }
+        break;
+      case 'frame':
+        L.push(`\tmat.set_shader_parameter("${r.name}", ${r.type === 'float' ? 'float(_frame)' : '_frame'})`);
+        L.push('\t_frame += 1');
+        break;
+      case 'timedelta':
+        L.push(`\tmat.set_shader_parameter("${r.name}", delta)`);
+        break;
+      case 'date':
+        L.push('\tvar d := Time.get_datetime_dict_from_system()');
+        L.push('\tvar secs: float = d.hour * 3600.0 + d.minute * 60.0 + d.second + fmod(Time.get_unix_time_from_system(), 1.0)');
+        L.push(`\tmat.set_shader_parameter("${r.name}", Vector4(d.year, d.month - 1, d.day, secs))`);
+        break;
+    }
+  }
+  return L.join('\n') + '\n';
+}

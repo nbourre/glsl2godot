@@ -1,0 +1,35 @@
+name: Validation avec Godot
+
+# Convertit tous les shaders de tests/corpus puis les compile avec le vrai
+# compilateur de shaders de Godot (mode headless). Le build échoue si un
+# shader converti ne compile pas.
+
+on:
+  push:
+  pull_request:
+
+env:
+  GODOT_VERSION: 4.5.1
+
+jobs:
+  godot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Télécharger Godot
+        run: |
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          echo "GODOT=$PWD/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Convertir et valider le corpus
+        run: tools/check.sh "$GODOT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shaders-convertis
+          path: tests/out

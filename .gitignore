@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-single/
+tests/out/
+*.log
+Godot_v*
+godot.zip
+tools/_check.gd
+.godot/
