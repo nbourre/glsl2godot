@@ -760,6 +760,8 @@ export function convert(opts: ConvertOptions): ConvertResult {
         warn(`${n} : assigne la texture dans l'inspecteur du ShaderMaterial. Si c'était un Buffer Shadertoy (multipasse), il faut le recréer avec un SubViewport.`);
       if (r.role === 'channelres') warn(`${n} : Godot ne fournit pas la taille des textures automatiquement; remplis ce tableau dans le script ou utilise textureSize().`);
     }
+    if ([...roles.values()].some((r) => r.role === 'channel'))
+      info(`Si un iChannel est une texture de bruit de Shadertoy (RGBA Noise), utilise textures/rgba_noise_256.png (ou textures/rgba_noise_64.png). Le canal vert y est le rouge décalé de (37, 17), comme sur Shadertoy. Dans Godot, importe-la en mode Lossless.`);
   }
   if (!canvas) info("Cible 3D : la couleur est écrite dans ALBEDO avec render_mode unshaded. Godot travaille en espace linéaire, les couleurs peuvent paraître plus claires que dans le navigateur.");
 
@@ -1155,6 +1157,21 @@ function proc(ctx: WalkCtx, node: Node, noNewScope = false): string | null {
       if (ctx.plan && ['+', '-', '*', '/', '<', '>', '<=', '>=', '==', '!='].includes(op)) {
         if (isFloatKind(lt) && isIntScalar(rt)) coerce(node.right, rt, 'float');
         else if (isFloatKind(rt) && isIntScalar(lt)) coerce(node.left, lt, 'float');
+      }
+      // ivec2 & 255 : Godot exige deux vecteurs pour les opérateurs entiers
+      if (ctx.plan && ['&', '|', '^', '%', '<<', '>>'].includes(op)) {
+        const isIntVec = (t: string | null) => !!t && /^[iu]vec[234]$/.test(t);
+        if (isIntVec(lt) && isIntScalar(rt)) {
+          replaceText(node.right, `${lt}(${genTrim(node.right)})`, lt);
+          return lt;
+        }
+        if (isIntVec(rt) && isIntScalar(lt)) {
+          const text = genTrim(node.left);
+          const trailing = gen(node.left).match(/\s*$/)?.[0] ?? '';
+          replaceText(node.left, `${rt}(${text})`, rt);
+          node.left.whitespace = trailing;
+          return rt;
+        }
       }
       if (['<', '>', '<=', '>=', '==', '!='].includes(op)) return 'bool';
       if (['<<', '>>', '&', '|', '^', '%'].includes(op)) return lt;
