@@ -2,6 +2,7 @@ import './style.css';
 import { convert, ConvertResult, Target } from './converter';
 import { EXAMPLES } from './examples';
 import { highlight } from './highlight';
+import { applyStaticTranslations, dialectLabel, Language, text, translateConversionText } from './i18n';
 import { Preview } from './preview';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -20,9 +21,19 @@ const tabShader = $<HTMLButtonElement>('tab-shader');
 const tabScript = $<HTMLButtonElement>('tab-script');
 const copyStatus = $('copy-status');
 const previewStatus = $('preview-status');
+const languageSelect = $<HTMLSelectElement>('language');
 
 let result: ConvertResult | null = null;
 let tab: 'shader' | 'script' = 'shader';
+let language: Language = 'en';
+try {
+  const savedLanguage = localStorage.getItem('glsl2godot-language');
+  if (savedLanguage === 'fr' || savedLanguage === 'en') language = savedLanguage;
+} catch {
+  // Language preference storage is optional.
+}
+languageSelect.value = language;
+applyStaticTranslations(language);
 
 /* ---------- Aperçu ---------- */
 const preview = new Preview($<HTMLCanvasElement>('preview'));
@@ -34,8 +45,10 @@ preview.onStatus = (ok, msg) => {
 /* ---------- Conversion ---------- */
 function run() {
   const vtx = hasVertex.checked ? vertex.value : '';
-  result = convert({ fragment: fragment.value, vertex: vtx, target: target.value as Target });
-  dialect.textContent = result.ok && (fragment.value.trim() || vtx.trim()) ? `Détecté : ${result.dialectLabel}` : '';
+  result = convert({ fragment: fragment.value, vertex: vtx, target: target.value as Target, language });
+  dialect.textContent = result.ok && (fragment.value.trim() || vtx.trim())
+    ? text('detected', language).replace('{dialect}', dialectLabel(result.dialect, language))
+    : '';
   tabScript.hidden = !result.script;
   if (!result.script && tab === 'script') setTab('shader');
   renderCode();
@@ -48,11 +61,13 @@ function renderCode() {
   if (!result.ok) {
     code.innerHTML = '';
     code.parentElement!.classList.add('empty');
+    code.parentElement!.setAttribute('data-empty-text', text('emptyCode', language));
     return;
   }
   code.parentElement!.classList.remove('empty');
-  const text = tab === 'script' && result.script ? result.script : result.shader;
-  code.innerHTML = highlight(text);
+  code.parentElement!.removeAttribute('data-empty-text');
+  const output = tab === 'script' && result.script ? result.script : result.shader;
+  code.innerHTML = highlight(output);
 }
 
 function renderMessages() {
@@ -62,20 +77,20 @@ function renderMessages() {
   const list = result.messages.length
     ? result.messages
     : result.ok
-      ? [{ level: 'info' as const, text: 'Rien à signaler : la conversion est directe.' }]
+      ? [{ level: 'info' as const, text: text('nothingToReport', language) }]
       : [];
   const order = { error: 0, warning: 1, info: 2 };
   for (const m of [...list].sort((a, b) => order[a.level] - order[b.level])) {
     const li = document.createElement('li');
     li.className = 'msg msg-' + m.level;
     const tag = document.createElement('strong');
-    tag.textContent = m.level === 'error' ? 'Erreur' : m.level === 'warning' ? 'À vérifier' : 'Note';
-    li.append(tag, document.createTextNode(' ' + m.text));
+    tag.textContent = m.level === 'error' ? text('error', language) : m.level === 'warning' ? text('check', language) : text('note', language);
+    li.append(tag, document.createTextNode(' ' + translateConversionText(m.text, language)));
     messages.append(li);
   }
   for (const s of result.setup) {
     const li = document.createElement('li');
-    li.textContent = s;
+    li.textContent = translateConversionText(s, language);
     setup.append(li);
   }
 }
@@ -86,7 +101,7 @@ function schedule() {
   clearTimeout(timer);
   timer = window.setTimeout(run, 150);
   clearTimeout(previewTimer);
-  previewTimer = window.setTimeout(() => preview.load(fragment.value), 500);
+  previewTimer = window.setTimeout(() => preview.load(fragment.value, language), 500);
 }
 
 /* ---------- Onglets ---------- */
@@ -120,28 +135,28 @@ function flash(msg: string) {
 
 $('copy').addEventListener('click', async () => {
   const text = currentText();
-  if (!text) return flash('Rien à copier pour l’instant.');
+  if (!text) return flash(windowText('nothingToCopy'));
   try {
     await navigator.clipboard.writeText(text);
-    flash(`${currentName()} copié.`);
+    flash(windowText('copied').replace('{file}', currentName()));
   } catch {
     const r = document.createRange();
     r.selectNodeContents(code);
     getSelection()?.removeAllRanges();
     getSelection()?.addRange(r);
-    flash('Texte sélectionné : fais Ctrl+C.');
+    flash(windowText('selectedCopy'));
   }
 });
 
 $('download').addEventListener('click', () => {
   const text = currentText();
-  if (!text) return flash('Rien à télécharger pour l’instant.');
+  if (!text) return flash(windowText('nothingToDownload'));
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
   a.download = currentName();
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  flash(`${currentName()} téléchargé.`);
+  flash(windowText('downloaded').replace('{file}', currentName()));
 });
 
 /* ---------- Partage par lien ---------- */
@@ -172,11 +187,15 @@ $('share').addEventListener('click', async () => {
   history.replaceState(null, '', url);
   try {
     await navigator.clipboard.writeText(url);
-    flash('Lien de partage copié.');
+    flash(windowText('shareCopied'));
   } catch {
-    flash('Lien prêt dans la barre d’adresse.');
+    flash(windowText('shareReady'));
   }
 });
+
+function windowText(key: Parameters<typeof text>[0]): string {
+  return text(key, language);
+}
 
 /* ---------- Brouillon ---------- */
 function saveDraft() {
@@ -208,13 +227,24 @@ example.addEventListener('change', () => {
   applyState({ f: ex.fragment, v: ex.vertex ?? '', hv: !!ex.vertex, t: 'auto' });
   example.value = '';
   run();
-  preview.load(fragment.value);
+  preview.load(fragment.value, language);
 });
 
 /* ---------- Événements ---------- */
 fragment.addEventListener('input', schedule);
 vertex.addEventListener('input', schedule);
 target.addEventListener('change', run);
+languageSelect.addEventListener('change', () => {
+  language = languageSelect.value === 'fr' ? 'fr' : 'en';
+  applyStaticTranslations(language);
+  try {
+    localStorage.setItem('glsl2godot-language', language);
+  } catch {
+    // Language preference storage is optional.
+  }
+  run();
+  preview.load(fragment.value, language);
+});
 hasVertex.addEventListener('change', () => {
   vertexWrap.hidden = !hasVertex.checked;
   run();
@@ -253,7 +283,7 @@ for (const ta of [fragment, vertex]) {
       applyState({ f: s.f, v: s.v, hv: !!s.v, t: s.t });
       loaded = true;
     } catch {
-      flash('Le lien de partage est invalide.');
+      flash(windowText('invalidShare'));
     }
   }
   if (!loaded) {
@@ -269,5 +299,5 @@ for (const ta of [fragment, vertex]) {
   }
   if (!loaded) applyState({ f: EXAMPLES[0].fragment });
   run();
-  preview.load(fragment.value);
+  preview.load(fragment.value, language);
 })();

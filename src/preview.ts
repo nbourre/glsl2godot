@@ -80,14 +80,14 @@ export class Preview {
   }
 
   /** Compile le fragment shader selon sa convention probable. */
-  load(source: string) {
+  load(source: string, language: 'en' | 'fr' = 'en') {
     const gl = this.gl;
-    if (!gl) return this.onStatus(false, 'WebGL 2 indisponible dans ce navigateur.');
+    if (!gl) return this.onStatus(false, language === 'fr' ? 'WebGL 2 indisponible dans ce navigateur.' : 'WebGL 2 is not available in this browser.');
     if (this.prog) gl.deleteProgram(this.prog);
     this.prog = null;
     if (!source.trim() || /^\s*\/\*\s*\{/.test(source) || /#include\s*</.test(source)) {
       cancelAnimationFrame(this.raf);
-      return this.onStatus(false, "Aperçu non disponible pour ce type de shader.");
+      return this.onStatus(false, language === 'fr' ? "Aperçu non disponible pour ce type de shader." : 'Preview is not available for this shader type.');
     }
     let vs = VERT1;
     let fs: string;
@@ -99,7 +99,7 @@ export class Preview {
       fs = source;
     } else if (/^\s*#version\s+\d+/m.test(source)) {
       cancelAnimationFrame(this.raf);
-      return this.onStatus(false, 'Aperçu limité au GLSL ES (WebGL).');
+      return this.onStatus(false, language === 'fr' ? 'Aperçu limité au GLSL ES (WebGL).' : 'Preview is limited to GLSL ES (WebGL).');
     } else {
       fs = (/precision\s+\w+\s+float/.test(source) ? '' : 'precision highp float;\n') + source;
       if (/^\s*varying\b/m.test(fs)) vs = 'attribute vec2 p; varying vec2 _pv; void main(){ _pv = p; gl_Position = vec4(p, 0.0, 1.0); }';
@@ -133,12 +133,12 @@ export class Preview {
       this.prog = prog;
       this.start = performance.now();
       this.frame = 0;
-      this.onStatus(true, 'Shader d’origine, rendu par ton navigateur.');
+      this.onStatus(true, language === 'fr' ? 'Shader d’origine, rendu par ton navigateur.' : 'Original shader, rendered by your browser.');
       cancelAnimationFrame(this.raf);
       this.loop();
     } catch (e: any) {
       cancelAnimationFrame(this.raf);
-      this.onStatus(false, 'Le navigateur ne compile pas ce shader : ' + String(e.message ?? e).replace(/^ERROR: 0:\d+: /, ''));
+      this.onStatus(false, (language === 'fr' ? 'Le navigateur ne compile pas ce shader : ' : 'Your browser could not compile this shader: ') + String(e.message ?? e).replace(/^ERROR: 0:\d+: /, ''));
     }
   }
 

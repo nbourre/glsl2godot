@@ -12,6 +12,15 @@ export const DIALECT_LABELS: Record<Dialect, string> = {
   generic: 'GLSL générique (WebGL / OpenGL)',
 };
 
+export const DIALECT_LABELS_EN: Record<Dialect, string> = {
+  shadertoy: 'Shadertoy',
+  glslsandbox: 'GLSL Sandbox',
+  bookofshaders: 'The Book of Shaders / glslCanvas',
+  isf: 'ISF (Interactive Shader Format)',
+  threejs: 'three.js (ShaderMaterial)',
+  generic: 'Generic GLSL (WebGL / OpenGL)',
+};
+
 export type Role = 'time' | 'resolution' | 'mouse' | 'frame' | 'timedelta' | 'date' | 'channel' | 'channelres' | 'channeltime' | 'samplerate';
 
 export interface RoleDef {

@@ -4,6 +4,8 @@ Convertisseur web de shaders GLSL vers le langage de shader de **Godot 4**. On c
 
 Tout se passe dans le navigateur : aucun serveur, aucun envoi de code.
 
+L’interface est en anglais par défaut. Le sélecteur de langue permet de passer en français et mémorise le choix dans le navigateur.
+
 ## Sources reconnues
 
 | Source | Détection | Ce qui est converti |

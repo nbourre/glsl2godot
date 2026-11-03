@@ -253,7 +253,7 @@ textarea {
   min-height: 360px;
 }
 .code.empty::before {
-  content: 'Corrige l’erreur indiquée plus bas pour voir le résultat.';
+  content: attr(data-empty-text);
   color: var(--muted);
   font-family: var(--ui);
 }

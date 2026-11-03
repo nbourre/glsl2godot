@@ -11,7 +11,7 @@ import {
   scalarOf, vecOf, vecSize,
 } from './types';
 import {
-  attributeFor, DIALECT_LABELS, Dialect, FUNCTION_RENAMES, GODOT_CONSTANTS, GODOT_RESERVED, matrixFor,
+  attributeFor, DIALECT_LABELS, DIALECT_LABELS_EN, Dialect, FUNCTION_RENAMES, GODOT_CONSTANTS, GODOT_RESERVED, matrixFor,
   Role, ROLE_NAMES, THREE_FRAGMENT_BUILTINS, THREE_VERTEX_BUILTINS, varyingFallback,
 } from './dialects';
 import { generateScript, ScriptRole } from './script';
@@ -26,6 +26,7 @@ export interface ConvertOptions {
   fragment: string;
   vertex?: string;
   target?: Target;
+  language?: 'en' | 'fr';
 }
 
 export interface Message {
@@ -178,6 +179,7 @@ interface Plan {
 /* ------------------------------------------------------------------ */
 
 export function convert(opts: ConvertOptions): ConvertResult {
+  const language = opts.language ?? 'en';
   const messages: Message[] = [];
   const warn = (text: string) => messages.push({ level: 'warning', text });
   const info = (text: string) => messages.push({ level: 'info', text });
@@ -553,14 +555,16 @@ export function convert(opts: ConvertOptions): ConvertResult {
   for (const plan of plans)
     for (const g of plan.stage.globals.values())
       if (g.storage === 'uniform' || g.storage === 'const' || (g.storage === 'none' && !plan.threads.has(g.name) && !(g as any).__mapped)) globalNames.add(g.name);
-  for (const plan of plans) transformStage(plan, { globalNames, warn, info, roles, varyings, dialect });
+  for (const plan of plans) transformStage(plan, { globalNames, warn, info, roles, varyings, dialect, language });
 
   /* --- Émission --- */
   const out: string[] = [];
   out.push(`shader_type ${target};`);
   out.push(canvas ? 'render_mode unshaded;' : 'render_mode unshaded;');
   out.push('');
-  out.push(`// Converti depuis ${DIALECT_LABELS[dialect]} avec glsl2godot.`);
+  out.push(language === 'fr'
+    ? `// Converti depuis ${DIALECT_LABELS[dialect]} avec glsl2godot.`
+    : `// Converted from ${DIALECT_LABELS_EN[dialect]} with glsl2godot.`);
   if (isf?.DESCRIPTION) out.push(`// ${String(isf.DESCRIPTION).replace(/\n/g, ' ')}`);
   if (isf?.CREDIT) out.push(`// Crédit : ${String(isf.CREDIT).replace(/\n/g, ' ')}`);
 
@@ -585,7 +589,7 @@ export function convert(opts: ConvertOptions): ConvertResult {
         def = '44100.0';
         break;
     }
-    const comment = {
+    const comment = (language === 'fr' ? {
       resolution: ' // taille en pixels, mise à jour par le script',
       mouse: ' // souris, mise à jour par le script',
       frame: ' // numéro d\'image, mis à jour par le script',
@@ -596,7 +600,18 @@ export function convert(opts: ConvertOptions): ConvertResult {
       channeltime: '',
       samplerate: '',
       time: '',
-    }[r.role];
+    } : {
+      resolution: ' // pixel size, updated by the script',
+      mouse: ' // mouse position, updated by the script',
+      frame: ' // frame number, updated by the script',
+      timedelta: ' // last frame duration, updated by the script',
+      date: ' // date, updated by the script',
+      channel: ' // assign a texture in the inspector',
+      channelres: ' // iChannel texture sizes, fill in manually',
+      channeltime: '',
+      samplerate: '',
+      time: '',
+    })[r.role];
     uniformLines.push(`uniform ${spec} ${name}${quant}${hint}${def ? ' = ' + def : ''};${comment}`);
     if (['resolution', 'mouse', 'frame', 'timedelta', 'date'].includes(r.role))
       scriptRoles.push({ name, role: r.role as ScriptRole['role'], type: spec, mouseFormat: r.mouseFormat as any });
@@ -722,7 +737,9 @@ export function convert(opts: ConvertOptions): ConvertResult {
     if (canvas) out.push(`\tCOLOR = ${outVar};`);
     else {
       out.push(`\tALBEDO = ${outVar}.rgb;`);
-      out.push(`\t// ALPHA = ${outVar}.a; // décommente pour la transparence`);
+      out.push(language === 'fr'
+        ? `\t// ALPHA = ${outVar}.a; // décommente pour la transparence`
+        : `\t// ALPHA = ${outVar}.a; // uncomment for transparency`);
     }
     out.push('}');
   } else if (frag && !frag.root) {
@@ -741,7 +758,7 @@ export function convert(opts: ConvertOptions): ConvertResult {
   }
   if (!canvas) info("Cible 3D : la couleur est écrite dans ALBEDO avec render_mode unshaded. Godot travaille en espace linéaire, les couleurs peuvent paraître plus claires que dans le navigateur.");
 
-  const script = scriptRoles.length ? generateScript(scriptRoles, canvas) : null;
+  const script = scriptRoles.length ? generateScript(scriptRoles, canvas, language) : null;
 
   const setup = canvas
     ? [
@@ -918,6 +935,7 @@ interface TransformEnv {
   roles: Map<string, { role: Role; type: string }>;
   varyings: Map<string, { type: string; quant: string; interp: string }>;
   dialect: Dialect;
+  language: 'en' | 'fr';
 }
 
 function lookupLocal(ctx: WalkCtx, name: string): LocalVar | null {
@@ -1553,7 +1571,7 @@ function transformStage(plan: Plan, env: TransformEnv) {
         if (header.returnType.specifier.specifier.token !== 'void') env.warn('La fonction main() du vertex shader ne retourne pas void.');
         hasReturn(node.body) &&
           env.warn("Le vertex shader utilise « return » dans main() : Godot l'interdit dans vertex(). Restructure avec des if/else.");
-        insertLocals(node, plan, extra);
+        insertLocals(node, plan, extra, env.language);
         continue;
       }
 
@@ -1572,7 +1590,7 @@ function transformStage(plan: Plan, env: TransformEnv) {
         const hasParams = (node.prototype.parameters ?? []).length > 0;
         node.prototype.rp.literal = (hasParams ? ', ' : '') + params.join(', ') + ')';
       }
-      if (isRoot) insertLocals(node, plan, extra);
+      if (isRoot) insertLocals(node, plan, extra, env.language);
     }
   }
 
@@ -1596,7 +1614,7 @@ function transformStage(plan: Plan, env: TransformEnv) {
   }
 }
 
-function insertLocals(node: Node, plan: Plan, extra: string[]) {
+function insertLocals(node: Node, plan: Plan, extra: string[], language: 'en' | 'fr') {
   const lines: string[] = [];
   const epilogue: string[] = [];
   for (const tname of extra) {
@@ -1614,7 +1632,8 @@ function insertLocals(node: Node, plan: Plan, extra: string[]) {
   if (epilogue.length) {
     const ws = String([node.body.lb?.whitespace ?? ''].flat().join(''));
     const indent = ws.includes('\n') ? ws.slice(ws.lastIndexOf('\n') + 1) : ' ';
-    node.body.statements.push(lit(`\n${indent}// copie des varyings calculés dans les fonctions\n${indent}` + epilogue.join(`\n${indent}`) + '\n'));
+    const comment = language === 'fr' ? 'copie des varyings calculés dans les fonctions' : 'copy varyings computed in helper functions';
+    node.body.statements.push(lit(`\n${indent}// ${comment}\n${indent}` + epilogue.join(`\n${indent}`) + '\n'));
   }
   // Globales utilisées par la racine mais pas dans extra (référencées seulement par la racine)
   if (lines.length) {
