@@ -1,12 +1,12 @@
 import shadertoyBasic from '../tests/corpus/shadertoy_basic.glsl?raw';
 import shadertoyScene from '../tests/corpus/shadertoy_scene.glsl?raw';
-import glslsandbox from '../tests/corpus/glslsandbox.glsl?raw';
-import bookofshaders from '../tests/corpus/bookofshaders.glsl?raw';
-import isf from '../tests/corpus/isf.glsl?raw';
+import glslsandbox from './examples/glslsandbox.glsl?raw';
+import bookofshaders from './examples/bookofshaders.glsl?raw';
+import isf from './examples/isf.glsl?raw';
 import threeFrag from '../tests/corpus/threejs.glsl?raw';
 import threeVert from '../tests/corpus/threejs.vert?raw';
-import glFrag from '../tests/corpus/opengl330.glsl?raw';
-import glVert from '../tests/corpus/opengl330.vert?raw';
+import glFrag from './examples/opengl330.glsl?raw';
+import glVert from './examples/opengl330.vert?raw';
 
 export interface Example {
   id: string;

@@ -264,15 +264,6 @@ for (const ta of [fragment, vertex]) {
   });
 }
 
-/* ---------- Lien vers le dépôt (déduit de l'adresse GitHub Pages) ---------- */
-{
-  const repo = $<HTMLAnchorElement>('repo');
-  const m = location.hostname.match(/^([\w-]+)\.github\.io$/);
-  const seg = location.pathname.split('/').filter(Boolean)[0];
-  if (m) repo.href = `https://github.com/${m[1]}/${seg ?? m[1] + '.github.io'}`;
-  else repo.hidden = true;
-}
-
 /* ---------- Démarrage ---------- */
 (async () => {
   const m = location.hash.match(/#s=([\w-]+)/);

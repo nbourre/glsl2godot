@@ -3,7 +3,10 @@
 set -e
 cd "$(dirname "$0")/.."
 npx vite-node tools/convert-corpus.ts tests/corpus tests/out
+# Les exemples de la page doivent aussi compiler dans Godot
+npx vite-node tools/convert-corpus.ts src/examples tests/out/examples
 tools/validate.sh "$1" tests/out || exit 1
+tools/validate.sh "$1" tests/out/examples || exit 1
 
 # Vérifie aussi que les scripts GDScript générés se chargent
 status=0
