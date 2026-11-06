@@ -767,16 +767,28 @@ export function convert(opts: ConvertOptions): ConvertResult {
 
   const script = scriptRoles.length ? generateScript(scriptRoles, canvas, language) : null;
 
+  const channelNames = dialect === 'shadertoy'
+    ? [...roles].filter(([, r]) => r.role === 'channel').map(([n]) => n).sort()
+    : [];
+  const channelSteps = channelNames.length
+    ? [
+        ...channelNames.map((n) => `${n} : dans l'inspecteur, section Shader Parameters, assigne une texture au paramètre « ${n} » (image importée, NoiseTexture2D ou ViewportTexture).`),
+        'Pour un Buffer Shadertoy : ajoute un SubViewport contenant un ColorRect avec le shader du buffer, puis assigne sa ViewportTexture au paramètre iChannel correspondant.',
+      ]
+    : [];
+
   const setup = canvas
     ? [
         'Ajoute un nœud ColorRect (ou TextureRect) et étire-le à la taille voulue.',
         'Dans Material, crée un nouveau ShaderMaterial et glisse-y le fichier .gdshader.',
         ...(script ? ['Attache le script .gd au même nœud : il met à jour la résolution, la souris et le reste à chaque image.'] : []),
+        ...channelSteps,
       ]
     : [
         'Ajoute un MeshInstance3D (un QuadMesh ou PlaneMesh pour un effet plein écran sur une surface).',
         'Dans Material Override, crée un nouveau ShaderMaterial et glisse-y le fichier .gdshader.',
         ...(script ? ['Attache le script .gd au MeshInstance3D pour alimenter la résolution, la souris et le reste.'] : []),
+        ...channelSteps,
       ];
 
   let shader = out.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';

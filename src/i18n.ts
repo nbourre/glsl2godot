@@ -141,6 +141,7 @@ const dialectLabels: Record<Language, Record<Dialect, string>> = {
 };
 
 const exactMessages: Record<string, string> = {
+  'Pour un Buffer Shadertoy : ajoute un SubViewport contenant un ColorRect avec le shader du buffer, puis assigne sa ViewportTexture au paramètre iChannel correspondant.': 'For a Shadertoy Buffer: add a SubViewport containing a ColorRect with the buffer shader, then assign its ViewportTexture to the matching iChannel parameter.',
   'Colle un shader pour commencer.': 'Paste a shader to get started.',
   'Aucun fragment shader fourni : un fragment() minimal a été généré.': 'No fragment shader provided: a minimal fragment() was generated.',
   "La cible 2D (canvas_item) n'utilise pas le vertex shader fourni : il a été ignoré. Choisis la cible 3D (spatial) pour le convertir.": 'The 2D target (canvas_item) does not use the provided vertex shader; it was ignored. Choose the 3D target (spatial) to convert it.',
@@ -162,6 +163,7 @@ const exactMessages: Record<string, string> = {
 };
 
 const messagePatterns: [RegExp, (match: RegExpMatchArray) => string][] = [
+  [/^(iChannel\d+) : dans l'inspecteur, section Shader Parameters, assigne une texture au paramètre « (iChannel\d+) » \(image importée, NoiseTexture2D ou ViewportTexture\)\.$/, (m) => `${m[1]}: in the inspector, under Shader Parameters, assign a texture to the “${m[2]}” parameter (imported image, NoiseTexture2D or ViewportTexture).`],
   [/^Erreur de syntaxe GLSL dans le (vertex|fragment) shader(?: \(ligne (\d+), colonne (\d+)\))? : (.*)$/s, (m) => `GLSL syntax error in the ${m[1]} shader${m[2] ? ` (line ${m[2]}, column ${m[3]})` : ''}: ${m[4]}`],
   [/^(Fragment|Vertex) : fonctions three\.js ajoutées \((.*)\)\.$/, (m) => `Injected three.js functions for ${m[1]}: ${m[2]}.`],
   [/^(Fragment|Vertex) : #include <(.*)> ne peut pas être résolu automatiquement et a été retiré\. Colle le contenu du chunk si le shader en dépend\.$/, (m) => `${m[1]}: #include <${m[2]}> could not be resolved automatically and was removed. Paste the chunk contents if the shader depends on it.`],
