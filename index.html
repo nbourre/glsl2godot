@@ -74,6 +74,10 @@
             <span data-i18n="vertexSeparate">Separate vertex shader</span>
           </label>
         </div>
+        <div class="toolbar">
+          <button id="save" type="button" data-i18n="save">Save</button>
+          <button id="history" type="button" aria-haspopup="dialog"></button>
+        </div>
         <div class="editor" id="vertex-wrap" hidden>
           <label for="vertex" class="editor-label" data-i18n="vertexShader">Vertex shader</label>
           <textarea id="vertex" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="void main() { gl_Position = … }"></textarea>
@@ -111,6 +115,15 @@
         <ol id="setup" class="setup"></ol>
       </div>
     </section>
+
+    <dialog id="library-dialog" class="library" aria-labelledby="library-title">
+      <div class="library-head">
+        <h2 id="library-title" data-i18n="savedTitle">Saved shaders</h2>
+        <button id="library-close" type="button" data-i18n="close">Close</button>
+      </div>
+      <p class="quiet" data-i18n="savedHint">Stored in this browser only.</p>
+      <ul id="library-list" class="library-list"></ul>
+    </dialog>
 
     <footer class="foot">
       <p data-i18n="privacy">Conversion happens entirely in your browser: your code is never sent anywhere. Tested with Godot 4.5.</p>

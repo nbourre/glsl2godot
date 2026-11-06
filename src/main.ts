@@ -5,6 +5,7 @@ import { highlight } from './highlight';
 import { applyStaticTranslations, dialectLabel, Language, text, translateConversionText } from './i18n';
 import { Preview } from './preview';
 import { errorLine, numberCode, numberTextarea } from './gutter';
+import { deleteShader, loadLibrary, saveShader } from './library';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -245,6 +246,76 @@ function applyState(s: { f?: string; v?: string; hv?: boolean; t?: string }) {
   vertexGutter.update();
 }
 
+/* ---------- Historique ---------- */
+const libraryList = $('library-list');
+const libraryDialog = $<HTMLDialogElement>('library-dialog');
+const historyButton = $<HTMLButtonElement>('history');
+
+function renderLibrary() {
+  libraryList.innerHTML = '';
+  const items = loadLibrary();
+  historyButton.textContent = windowText('historyButton').replace('{count}', String(items.length));
+  if (!items.length) {
+    const li = document.createElement('li');
+    li.className = 'quiet';
+    li.textContent = text('savedEmpty', language);
+    libraryList.append(li);
+    return;
+  }
+  for (const s of items) {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = s.name;
+    const date = document.createElement('span');
+    date.className = 'quiet';
+    date.textContent = new Date(s.date).toLocaleString(language);
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = text('open', language);
+    open.addEventListener('click', () => {
+      libraryDialog.close();
+      applyState(s);
+      run();
+      preview.load(fragment.value, language);
+      flash(windowText('opened').replace('{name}', s.name));
+    });
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = text('delete', language);
+    del.addEventListener('click', () => {
+      if (!confirm(windowText('confirmDelete').replace('{name}', s.name))) return;
+      deleteShader(s.id);
+      renderLibrary();
+    });
+    li.append(name, date, open, del);
+    libraryList.append(li);
+  }
+}
+
+historyButton.addEventListener('click', () => libraryDialog.showModal());
+$('library-close').addEventListener('click', () => libraryDialog.close());
+// Un clic sur le fond (hors de la carte) ferme la boîte
+libraryDialog.addEventListener('click', (e) => {
+  if (e.target === libraryDialog) libraryDialog.close();
+});
+
+$('save').addEventListener('click', () => {
+  if (!fragment.value.trim() && !vertex.value.trim()) return flash(windowText('nothingToSave'));
+  const fallback = `${windowText('defaultName')} ${new Date().toLocaleString(language)}`;
+  const name = prompt(windowText('savePrompt'), fallback);
+  if (name === null) return;
+  const ok = saveShader({
+    name: name.trim() || fallback,
+    f: fragment.value,
+    v: vertex.value,
+    hv: hasVertex.checked,
+    t: target.value,
+  });
+  if (ok) renderLibrary();
+  flash(windowText(ok ? 'saved' : 'saveFailed'));
+});
+
 /* ---------- Exemples ---------- */
 for (const ex of EXAMPLES) {
   const o = document.createElement('option');
@@ -273,6 +344,7 @@ languageSelect.addEventListener('change', () => {
   } catch {
     // Language preference storage is optional.
   }
+  renderLibrary();
   run();
   preview.load(fragment.value, language);
 });
@@ -320,6 +392,7 @@ for (const ta of [fragment, vertex]) {
     }
   }
   if (!loaded) applyState({ f: EXAMPLES[0].fragment });
+  renderLibrary();
   run();
   preview.load(fragment.value, language);
 })();

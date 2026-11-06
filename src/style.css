@@ -130,6 +130,24 @@ button.primary {
 }
 button.primary:hover { filter: brightness(1.08); }
 
+.library {
+  width: min(560px, calc(100vw - 32px));
+  max-height: 80vh;
+  padding: 18px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.library::backdrop { background: rgba(0, 0, 0, 0.5); }
+.library-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.library h2 { margin: 0; font-size: 1.15rem; }
+.library p { margin: 6px 0 12px; }
+.library-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.library-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.library-list .name { flex: 1; font-weight: 700; overflow-wrap: anywhere; }
+
 /* ---------- Scène (aperçu) ---------- */
 .stage {
   position: relative;
